@@ -1,61 +1,234 @@
 <!DOCTYPE html>
 <head>
     <title>Pusher Test</title>
-    <div id="player"></div>
     <script src="https://js.pusher.com/7.0/pusher.min.js"></script>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
-    <script>
-        var url = "http://127.0.0.1:9000/test";
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
+
+    <!--    // create a room-->
+    <input type="text" id="name" placeholder="Enter your name here">
+    <button id="createRoom"> Create Room </button>
+    <input type="text" id="videoUrl" placeholder="Enter the video url here">
+    <button id="stream"> Start streaming </button>
+
+    <!--    // join a room-->
+    <input type="text" id="roomId" placeholder="Enter Room Id here">
+    <button id="joinRoom"> Join Room </button>
+    <button id="sync"> Sync with the host </button>
+
+
+
+
+    <div id="player"></div>
+    <script>
+        var hosturl = "http://dcf327114bad.ngrok.io";
+        var createRoomUrl = hosturl + "/createRoom";
+        var joinRoomUrl = hosturl + "/joinRoom";
+        var updateUrl = hosturl + "/updateUrl";
+        var updateStateUrl = hosturl + "/updateState";
+        var syncUrl = hosturl + "/sync";
         var player;
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                height: '390',
-                width: '640',
-                videoId: '',
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
-                }
-            });
+        var videoUrl;
+        var username;
+        var roomId;
+        var host = false;
+        document.getElementById("videoUrl").style.visibility = "collapse";
+        document.getElementById("stream").style.visibility = "collapse";
+        document.getElementById("sync").style.visibility = "collapse";
+
+        document.getElementById("createRoom").addEventListener("click", function() {
+            var nameEle = document.getElementById("name");
+            if(name.value === null || name.value === ""){
+                alert("Please Enter a temporary username");
+            } else {
+
+                username = nameEle.value;
+
+                document.getElementById("createRoom").style.visibility = "hidden";
+                nameEle.style.visibility = "hidden";
+                document.getElementById("joinRoom").style.visibility = "collapse";
+                document.getElementById("roomId").style.visibility = "collapse";
+
+                document.getElementById("videoUrl").style.visibility="visible";
+                document.getElementById("stream").style.visibility = "visible";
+
+                //make a backend call to create a room
+                createRoom(username);
+
+           }
+
+        });
+
+        document.getElementById("joinRoom").addEventListener("click", function() {
+            var nameEle = document.getElementById("name");
+            if(name.value === null || name.value === "" || document.getElementById("roomId") === null || document.getElementById("roomId").value === ""){
+                alert("Please Enter a temporary username and roomID");
+            } else {
+
+                username = nameEle.value;
+                document.getElementById("joinRoom").style.visibility = "collapse";
+                document.getElementById("roomId").style.visibility = "collapse";
+                document.getElementById("joinRoom").style.visibility = "collapse";
+                document.getElementById("roomId").style.visibility = "collapse";
+                document.getElementById("sync").style.visibility = "visible";
+                roomId = document.getElementById("roomId").value;
+                joinRoom(username);
+
+           }
+
+        });
+
+        document.getElementById("sync").addEventListener("click", function() {
+                data = JSON.stringify({roomId: roomId});
+                makeAjaxCall(syncUrl,data);
+        });
+
+        function createRoom(username) {
+             data = JSON.stringify({hostname: username});
+             $.ajax({
+                     type: 'POST',
+                     url: createRoomUrl,
+                     contentType: 'application/json',
+                     data: data,
+                     success: function(response) {
+                        alert("share this room id with your friends" + response.roomId);
+                        roomId = response.roomId;
+                        host = true;
+                     }
+                 })
         }
 
+        function joinRoom(username) {
+
+            data = JSON.stringify({hostname: username, roomId: roomId});
+             $.ajax({
+                     type: 'POST',
+                     url: joinRoomUrl,
+                     contentType: 'application/json',
+                     data: data,
+                     success: function(response) {
+                        videoUrl = response.url;
+                        setYT();
+                        enablePusher(roomId, false);
+                     }
+                 })
+
+        }
+
+        document.getElementById("stream").addEventListener("click", function() {
+            var videoUrlEle = document.getElementById("videoUrl");
+            if(videoUrlEle.value == null || videoUrlEle.value===""){
+                alert("Please enter a youtube video url");
+            } else {
+                videoUrl = videoUrlEle.value;
+                setYT();
+                enablePusher(roomId, true);
+                player.cueVideoById(videoUrl, 0);
+
+                data = JSON.stringify({roomId: roomId, url: videoUrl});
+                $.ajax({
+                     type: 'POST',
+                     url: updateUrl,
+                     contentType: 'application/json',
+                     data: data
+                 })
+
+
+            }
+
+
+        });
+
+        function setYT() {
+            var tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            var firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+         }
+
+         function onYouTubeIframeAPIReady() {
+             player = new YT.Player('player', {
+                 height: '390',
+                 width: '640',
+                 videoId: '',
+                 events: {
+                     'onReady': onPlayerReady,
+                     'onStateChange': onPlayerStateChange
+                 }
+             });
+
+         }
+
         function onPlayerReady(event) {
-            player.cueVideoById('t2dPPR_JzwU', 0);
+            player.cueVideoById(videoUrl, 0);
         }
 
         function onPlayerStateChange(event) {
-            data = JSON.stringify({state: event.data, time: player.getCurrentTime()});
+            if(!host)
+                return;
+            data = JSON.stringify({state: event.data, time: player.getCurrentTime(), hostname: username, roomId: roomId});
             states = [YT.PlayerState.PAUSED, YT.PlayerState.PLAYING];
             if (states.includes(event.data)) {
                 $.ajax({
                     type: 'POST',
-                    url: url,
+                    url: updateStateUrl,
                     contentType: 'application/json',
                     data: data
                 })
             }
         }
 
-        Pusher.logToConsole = false;
-        var pusher = new Pusher('b0c7f76e11d1d09b4d50', {
-            cluster: 'ap2'
-        });
-        var channel = pusher.subscribe('my-channel');
-        channel.bind('my-event', function(data) {
+        function makeAjaxCall(backendUrl, data){
+            $.ajax({
+                    type: 'POST',
+                    url: backendUrl,
+                    contentType: 'application/json',
+                    data: data
+                })
+        }
+
+        function updateState(data) {
             console.log(data);
-            if (data.state == YT.PlayerState.PAUSED && player.getPlayerState() != YT.PlayerState.PAUSED) {
+            if (data.state == YT.PlayerState.PAUSED ) {
                 player.pauseVideo();
                 player.seekTo(data.time);
-            } else if (data.state == YT.PlayerState.PLAYING && player.getPlayerState() != YT.PlayerState.PLAYING) {
+            } else if (data.state == YT.PlayerState.PLAYING) {
                 player.seekTo(data.time);
                 player.playVideo();
             }
-        });
+        }
+
+        function syncWithHost(data) {
+            data = JSON.stringify({state: player.getPlayerState(), time: player.getCurrentTime(), hostname: username, roomId: roomId});
+            makeAjaxCall(updateStateUrl,data);
+
+        }
+
+
+        function enablePusher(channel, ishost){
+            Pusher.logToConsole = false;
+            var pusher = new Pusher('b0c7f76e11d1d09b4d50', {
+                cluster: 'ap2'
+            });
+            var channel = pusher.subscribe(channel);
+
+            if(!ishost)
+            channel.bind('updateState', updateState);
+
+            if(!ishost)
+            channel.bind('updateVideoUrl', function(data) {
+                console.log(data);
+                player.cueVideoById(data.videoUrl,0);
+            });
+
+            if(ishost)
+               channel.bind('sync', syncWithHost);
+        }
+
+        $(document).ready(function() {
+            document.getElementById("videoUrl").style.visibility="hidden";
+         });
+
 
     </script>
 </head>
