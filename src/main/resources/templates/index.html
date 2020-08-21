@@ -21,12 +21,15 @@
 
     <div id="player"></div>
     <script>
-        var hosturl = "http://dcf327114bad.ngrok.io";
+        var token;
+        var hosturl = "http://127.0.0.1:9000";
         var createRoomUrl = hosturl + "/createRoom";
         var joinRoomUrl = hosturl + "/joinRoom";
         var updateUrl = hosturl + "/updateUrl";
         var updateStateUrl = hosturl + "/updateState";
+        var initUserUrl = hosturl + "/init";
         var syncUrl = hosturl + "/sync";
+        var authUrl = hosturl + "/user/auth";
         var player;
         var videoUrl;
         var username;
@@ -36,13 +39,35 @@
         document.getElementById("stream").style.visibility = "collapse";
         document.getElementById("sync").style.visibility = "collapse";
 
+        function getToken() {
+            token = localStorage.getItem("token");
+            if (!token) {
+                $.get(authUrl, function(data, status){
+                    localStorage.setItem("token", data.token);
+                });
+            }
+            return localStorage.getItem("token");
+        }
+        getToken();
+
+        $.ajaxSetup({
+            beforeSend: function (xhr) {
+                token = localStorage.getItem("token");
+                xhr.setRequestHeader("SS-Token", token);
+            }
+        });
+
         document.getElementById("createRoom").addEventListener("click", function() {
             var nameEle = document.getElementById("name");
             if(name.value === null || name.value === ""){
                 alert("Please Enter a temporary username");
             } else {
-
                 username = nameEle.value;
+                createRoomResponse = createRoom(username);
+                if (createRoomResponse.status == "ERROR") {
+                    alert("Some error occurred");
+                    return;
+                }
 
                 document.getElementById("createRoom").style.visibility = "hidden";
                 nameEle.style.visibility = "hidden";
@@ -53,7 +78,6 @@
                 document.getElementById("stream").style.visibility = "visible";
 
                 //make a backend call to create a room
-                createRoom(username);
 
            }
 
@@ -85,17 +109,21 @@
 
         function createRoom(username) {
              data = JSON.stringify({hostname: username});
+             res = {status: "ERROR"};
              $.ajax({
                      type: 'POST',
                      url: createRoomUrl,
                      contentType: 'application/json',
                      data: data,
+                     async: false,
                      success: function(response) {
                         alert("share this room id with your friends" + response.roomId);
                         roomId = response.roomId;
                         host = true;
+                        res.status = "OK";
                      }
                  })
+             return res;
         }
 
         function joinRoom(username) {
@@ -203,7 +231,6 @@
             makeAjaxCall(updateStateUrl,data);
 
         }
-
 
         function enablePusher(channel, ishost){
             Pusher.logToConsole = false;
