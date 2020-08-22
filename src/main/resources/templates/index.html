@@ -90,13 +90,17 @@
             } else {
 
                 username = nameEle.value;
+                roomId = document.getElementById("roomId").value;
+                resp = joinRoom(username);
+                if (resp.status == "ERROR") {
+                    alert(resp.message);
+                    return;
+                }
                 document.getElementById("joinRoom").style.visibility = "collapse";
                 document.getElementById("roomId").style.visibility = "collapse";
                 document.getElementById("joinRoom").style.visibility = "collapse";
                 document.getElementById("roomId").style.visibility = "collapse";
                 document.getElementById("sync").style.visibility = "visible";
-                roomId = document.getElementById("roomId").value;
-                joinRoom(username);
 
            }
 
@@ -127,20 +131,25 @@
         }
 
         function joinRoom(username) {
-
+            res = {status: "ERROR", message: ""}
             data = JSON.stringify({hostname: username, roomId: roomId});
              $.ajax({
                      type: 'POST',
                      url: joinRoomUrl,
                      contentType: 'application/json',
                      data: data,
+                     async: false,
                      success: function(response) {
                         videoUrl = response.url;
                         setYT();
                         enablePusher(roomId, false);
+                        res.status = "OK";
+                     },
+                     error: function(response) {
+                        res.message = response.detail;
                      }
                  })
-
+            return res;
         }
 
         document.getElementById("stream").addEventListener("click", function() {

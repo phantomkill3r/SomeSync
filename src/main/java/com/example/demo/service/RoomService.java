@@ -43,15 +43,16 @@ public class RoomService {
         return String.format(createRoomUrl,roomId);
     }
 
-    public Map<String,Object> joinRoom(JoinRoomRequest request){
+    public Map<String,Object> joinRoom(JoinRoomRequest request) throws Exception {
         UserToken auth = (UserToken)SecurityContextHolder.getContext().getAuthentication();
         Room room = (Room)memCache.get(request.getRoomId());
         User user = new User(auth.getId(), request.getHostname(), request.getHostname(), false, null);
         if (room.getUserMap().get(auth.getId()) != null) {
-            room.getUserMap().put(auth.getId(), user);
+            throw new Exception("Cannot join");
         }
+        room.getUserMap().put(auth.getId(), user);
         Map<String, Object> data = new HashMap<>();
-        data.put("url", room.getCurrentUrl().isPresent() ? room.getCurrentUrl().get() : null);
+        data.put("url", room.getCurrentUrl().orElse(null));
         data.put("time",0);
         data.put("state", Constants.YTPlayer.PAUSED);
         return data;

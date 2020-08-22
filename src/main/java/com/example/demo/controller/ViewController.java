@@ -24,7 +24,7 @@ public class ViewController {
     }
 
     @PostMapping(value = "/joinRoom")
-    private Map<String,Object> joinRoom(@RequestBody JoinRoomRequest joinRoomRequest){
+    private Map<String,Object> joinRoom(@RequestBody JoinRoomRequest joinRoomRequest) throws Exception {
         return roomService.joinRoom(joinRoomRequest);
     }
 
